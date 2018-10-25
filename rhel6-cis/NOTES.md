@@ -52,3 +52,5 @@ This is best handled by AIDE or other file integrity monitoring systems.
 
 ##### 9.2
 These items all require human intervention to resolve.  None of these will be a concern while applying CIS to a vanilla RHEL6 install.
+
+### Test the updates the file NOTES.md
