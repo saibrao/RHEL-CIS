@@ -1,0 +1,102 @@
+---
+# This playbook will disable hyperthreads without requiring a reboot. To use it,
+# define the HOSTS variable with the hosts you'd like to modify:
+# ansible-playbook -e HOSTS=webservers,db01 CVE-2018-3620-fix_disable_ht.yml
+#
+# NOTE: If you have updated your system in response to CVE-2018-3620, there are
+# other methods to disable SMT which are persistent and more performant. See
+# the article at https://access.redhat.com/security/vulnerabilities/L1TF for more
+# details, and another playbook which can be used to apply the appropriate 
+# settings after updating your kernel.
+#
+# Playbook Ver. 1.0
+#
+- name: Disable hyperthreads
+  hosts: "{{HOSTS}}"
+#  user: unixsa
+#  become: yes
+#  become_user: root
+  vars:
+      cpus: []       # System cores/threads
+      pluggable: []  # Hotpluggable cores/threads
+      enabled: []    # Enabled cores/threads 
+      siblings: []   # List of siblings for each core/thread
+      disable: []    # List of cores/threads to be disabled
+
+  tasks:
+  - name: Detect running libvirt VMs
+    shell: ps -ef | grep [q]emu-kvm
+    register: vmlist
+    failed_when: False
+    changed_when: False
+
+  - fail:
+      msg: "This system appears to be acting as a hypervisor. Offlining cores/threads at runtime while VMs are running can cause unpredictable behavior, including data loss. Either stop all running VMs, or disable hyperthreading via another method, such as in the system BIOS."
+      when: vmlist.rc != 1
+
+  - name: Get CPU Info Directories
+    find:
+      paths: /sys/devices/system/cpu
+      file_type: directory
+      recurse: no
+      pattern: "cpu[0-9]*"
+    register: cpu_dirs
+
+  - fail:
+      msg: "This system doesn't support runtime offlining of threads/cores. Please update your kernel."
+    when: cpu_dirs.matched == 0
+
+  - set_fact:
+      cpus: "{{ cpus + [item.path] }}"
+    with_items: "{{ cpu_dirs.files }}"
+    
+  - name: Determine CPU offlining capability
+    stat:
+      path: "{{ item }}/online"
+    register: cpu_online_stat
+    with_items: "{{ cpus }}"
+    
+  - set_fact:
+      pluggable: "{{ pluggable + [ item.item ] if item.stat.exists else pluggable }}"
+    with_items: "{{ cpu_online_stat.results }}"
+  
+  - name: Get online status for each CPU
+    slurp:
+      path: "{{ item }}/online"
+    register: cpu_online
+    with_items: "{{ pluggable }}"
+
+  - set_fact:
+       enabled: "{{ enabled + [item.item] if item.content|b64decode|trim == '1' else enabled }}"
+    with_items: "{{ cpu_online.results }}"
+
+  - name: Get core siblings for each CPU
+    slurp:
+      path: "{{ item }}/topology/thread_siblings_list"
+    register: cpu_siblings
+    with_items: "{{ enabled }}"
+
+  - set_fact:
+      siblings: "{{ (siblings + [(item.content|b64decode|trim).split(',')]) | unique }}"
+    with_items: "{{ cpu_siblings.results }}"
+
+  - set_fact:
+      disable: "{{ disable + item[1:] if (item|length) > 1 else disable }}"
+    with_nested:
+      - "{{ siblings }}"
+
+  - name: End play if there are no siblings to disable
+    meta: end_play
+    when: disable|length == 0
+
+  - fail:
+      msg: "Unable to disable core {{ item }}."
+    when: "'/sys/devices/system/cpu/cpu' + item not in pluggable"
+    with_items: "{{ disable }}"
+
+  - name: Disable hyperthreads
+    shell: echo '0' > /sys/devices/system/cpu/cpu{{ item | quote }}/online
+    with_items: "{{ disable }}"
+    
+  - name: Disable SMT at boot time
+    command: grubby --args "nosmt" --update-kernel=ALL

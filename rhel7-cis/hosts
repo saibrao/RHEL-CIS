@@ -1,0 +1,3 @@
+[targets]
+#localhost       ansible_connection=local
+dc2nix2d100.acml.com
