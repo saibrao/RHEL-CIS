@@ -1,0 +1,8 @@
+---
+- hosts: web
+  name: This is roled based playbook
+  become: yes
+#  gather_facts: false
+
+  roles:
+    - apache-simple

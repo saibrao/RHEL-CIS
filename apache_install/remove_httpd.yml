@@ -1,0 +1,16 @@
+---
+- hosts: web
+  name: Remove httpd
+  become: yes
+
+  tasks:
+
+    - name: Stop the httpd
+      service:
+        name: httpd
+        state: stopped
+
+    - name: Remove httpd pkg
+      yum:
+        name: httpd
+        state: absent

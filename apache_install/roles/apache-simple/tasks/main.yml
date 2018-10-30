@@ -1,0 +1,37 @@
+---
+# tasks file for apache-simple
+- name: Install httpd packages
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ httpd_packages }}"
+  notify: restart httpd service
+
+- name: create site-enabled directory
+  file:
+    name: /etc/httpd/conf/sites-enabled
+    state: directory
+
+- name: Create module.conf directory
+  file:
+    name: /etc/httpd/conf.modules.d
+    state: directory
+
+- name: copy httpd.conf
+  template:
+    src: templates/httpd.conf.j2
+    dest: /etc/httpd/conf/httpd.conf
+    backup: yes
+  notify: restart httpd service
+
+- name: copy index.html
+  template:
+    src: templates/index.html.j2
+    dest: /var/www/html/index.html
+    backup: yes
+
+- name: start httpd service
+  service:
+    name: httpd
+    state: started
+    enabled: yes

@@ -1,0 +1,56 @@
+---
+- hosts: web
+  name: Install web application
+  become: yes
+  gather_facts: false
+  vars:
+    httpd_packages:
+      - httpd
+      - mod_wsgi
+    apache_test_message: This is a test message
+    apache_max_keep_alive_requests: 115 
+
+  tasks:
+
+    - name: Install httpd packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      with_items: "{{ httpd_packages }}"
+      notify: restart httpd service
+
+    - name: create site-enabled directory
+      file:
+        name: /etc/httpd/conf/sites-enabled 
+        state: directory
+
+    - name: Create module.conf directory
+      file:
+        name: /etc/httpd/conf.modules.d
+        state: directory
+
+    - name: copy httpd.conf
+      template:
+        src: templates/httpd.conf.j2
+        dest: /etc/httpd/conf/httpd.conf
+        backup: yes
+      notify: restart httpd service
+
+    - name: copy index.html
+      template:
+        src: templates/index.html.j2
+        dest: /var/www/html/index.html
+        backup: yes
+
+    - name: start httpd service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart httpd service
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
