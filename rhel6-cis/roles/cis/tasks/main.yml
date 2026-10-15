@@ -18,6 +18,13 @@
 #  - include: test.yml
 #    tags: section1
 
+  - name: Check OS version and family
+    fail:
+      msg: "This role requires a RedHat-family OS with major version 6. Detected {{ ansible_distribution | default('unknown') }} {{ ansible_distribution_major_version | default('unknown') }} (family: {{ ansible_os_family | default('unknown') }})."
+    when: (ansible_os_family | default('')) != 'RedHat' or (ansible_distribution_major_version | default('') | string) != '6'
+    tags:
+      - always
+
   - include: section_01.yml
     tags: section1
 

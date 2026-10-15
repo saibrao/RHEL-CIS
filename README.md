@@ -106,3 +106,23 @@ The [RHEL 7 test playbook](rhel7-cis/tests/test.yml) references
 discovery setup before use. Use the main playbook for the inspection commands
 above, and independently audit the resulting host configuration against the
 benchmark required by your organization.
+
+### OS guard regression checks
+
+Both roles check the RedHat OS family and their required major version before
+loading configuration tasks. Missing facts also cause the guard to fail. The
+guards use the `always` tag; explicitly skipping that tag bypasses them.
+
+Run the focused regression checks in a Python environment with `ansible-core`
+and PyYAML installed and `ansible-playbook` on `PATH`:
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+These checks execute each role's actual first task against synthetic OS facts,
+followed by a harmless sentinel representing a configuration change. They check
+supported hosts, unsupported hosts, missing facts, section-tag selection, and
+check mode. They also verify that the guard is first and that no role dependencies
+precede it. Tested with ansible-core 2.16.14; this isolated guard test does not
+establish compatibility of the full legacy roles with that version of Ansible.
